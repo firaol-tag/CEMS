@@ -1,4 +1,4 @@
-const connectDb = require('../config/db');
+const connectDb = require('../../config/db');
 
 async function getMessageRecords(query) {
   const pool = await connectDb();
@@ -13,13 +13,13 @@ async function getMessageRecords(query) {
     params.push(query.channel);
   }
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-  const [rows] = await pool.execute(`SELECT * FROM message_queue ${whereClause} ORDER BY created_at DESC` , params);
+  const [rows] = await pool.query(`SELECT * FROM message_queue ${whereClause} ORDER BY created_at DESC` , params);
   return rows;
 }
 
 async function getMessageRecordById(id) {
   const pool = await connectDb();
-  const [rows] = await pool.execute('SELECT * FROM message_queue WHERE id = ?', [id]);
+  const [rows] = await pool.query('SELECT * FROM message_queue WHERE id = ?', [id]);
   if (!rows.length) {
     const err = new Error('Message not found');
     err.status = 404;

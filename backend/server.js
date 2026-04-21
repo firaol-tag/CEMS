@@ -3,27 +3,30 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 require('express-async-errors');
 const connectDb = require('./config/db');
-const authRoutes = require('./routes/auth.route');
-const customerRoutes = require('./routes/customer.route');
-const campaignRoutes = require('./routes/campaign.route');
-const segmentRoutes = require('./routes/segment.route');
-const messageRoutes = require('./routes/message.route');
-const { errorHandler } = require('./middlewares/errorMiddleware');
+const authRoutes = require('./API/routes/auth.route');
+const customerRoutes = require('./API/routes/customer.route');
+const campaignRoutes = require('./API/routes/campaign.route');
+const segmentRoutes = require('./API/routes/segment.route');
+const messageRoutes = require('./API/routes/message.route');
+const { errorHandler } = require('./middleware/errorMiddleware');
 
-dotenv.config();
+dotenv.config({ path: __dirname + '/.env' });
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use('/images', express.static('public/images'));
+
+const authMiddleware = require('./middleware/auth');
 
 app.use('/api/auth', authRoutes);
-app.use('/api/customers', customerRoutes);
-app.use('/api/campaigns', campaignRoutes);
-app.use('/api/segments', segmentRoutes);
-app.use('/api/messages', messageRoutes);
+app.use('/api/customers', authMiddleware, customerRoutes);
+app.use('/api/campaigns', authMiddleware, campaignRoutes);
+app.use('/api/segments', authMiddleware, segmentRoutes);
+app.use('/api/messages', authMiddleware, messageRoutes);
 
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 connectDb()
   .then(() => app.listen(PORT, () => console.log(`Backend running on port ${PORT}`)))
   .catch(err => {

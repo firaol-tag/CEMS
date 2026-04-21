@@ -1,20 +1,28 @@
-const sgMail = require('@sendgrid/mail');
+const nodemailer = require('nodemailer');
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY || '');
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: process.env.SMTP_PORT || 587,
+  secure: false, // true for 465, false for other ports
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 async function sendEmail({ to, subject, html }) {
-  if (!process.env.SENDGRID_API_KEY) {
-    throw new Error('SendGrid API key is not configured');
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    throw new Error('SMTP credentials are not configured');
   }
 
-  const msg = {
+  const mailOptions = {
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
     to,
-    from: process.env.SENDGRID_FROM_EMAIL || 'no-reply@cems.local',
     subject,
     html,
   };
 
-  return sgMail.send(msg);
+  return transporter.sendMail(mailOptions);
 }
 
 module.exports = { sendEmail };

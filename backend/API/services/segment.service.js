@@ -1,8 +1,8 @@
-const connectDb = require('../config/db');
+const connectDb = require('../../config/db');
 
 async function createSegmentRecord(data) {
   const pool = await connectDb();
-  const [result] = await pool.execute(
+  const [result] = await pool.query(
     'INSERT INTO customer_segments (name, filter_json, created_at) VALUES (?, ?, ?)',
     [data.name, JSON.stringify(data.filter_json || {}), new Date()]
   );
@@ -11,13 +11,13 @@ async function createSegmentRecord(data) {
 
 async function getSegmentRecords() {
   const pool = await connectDb();
-  const [rows] = await pool.execute('SELECT * FROM customer_segments ORDER BY created_at DESC');
+  const [rows] = await pool.query('SELECT * FROM customer_segments ORDER BY created_at DESC');
   return rows.map(row => ({ ...row, filter_json: JSON.parse(row.filter_json || '{}') }));
 }
 
 async function getSegmentRecordById(id) {
   const pool = await connectDb();
-  const [rows] = await pool.execute('SELECT * FROM customer_segments WHERE id = ?', [id]);
+  const [rows] = await pool.query('SELECT * FROM customer_segments WHERE id = ?', [id]);
   if (!rows.length) {
     const err = new Error('Segment not found');
     err.status = 404;
@@ -29,7 +29,7 @@ async function getSegmentRecordById(id) {
 
 async function updateSegmentRecord(id, data) {
   const pool = await connectDb();
-  const [rows] = await pool.execute('SELECT * FROM customer_segments WHERE id = ?', [id]);
+  const [rows] = await pool.query('SELECT * FROM customer_segments WHERE id = ?', [id]);
   if (!rows.length) {
     const err = new Error('Segment not found');
     err.status = 404;
@@ -47,13 +47,13 @@ async function updateSegmentRecord(id, data) {
   }
   if (!changes.length) return getSegmentRecordById(id);
   params.push(id);
-  await pool.execute(`UPDATE customer_segments SET ${changes.join(', ')} WHERE id = ?`, params);
+  await pool.query(`UPDATE customer_segments SET ${changes.join(', ')} WHERE id = ?`, params);
   return getSegmentRecordById(id);
 }
 
 async function deleteSegmentRecord(id) {
   const pool = await connectDb();
-  await pool.execute('DELETE FROM customer_segments WHERE id = ?', [id]);
+  await pool.query('DELETE FROM customer_segments WHERE id = ?', [id]);
 }
 
 module.exports = {

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS customers (
   phone VARCHAR(50),
   gender VARCHAR(50),
   location VARCHAR(120),
+  customer_type ENUM('g-power','five-star','regular') DEFAULT 'regular',
   last_purchase_date DATE,
   created_at DATETIME
 );

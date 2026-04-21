@@ -1,7 +1,8 @@
 const connectDb = require('../config/db');
 const { fetchPendingJobs, updateJob } = require('../config/queue');
 const { sendEmail } = require('../config/mailer');
-const { sendSms } = require('../services/sms.service');
+const { sendSms } = require('../API/services/sms.service');
+const { selectCustomersForCampaign } = require('../API/services/campaign.service');
 
 async function processJob(job) {
   const pool = await connectDb();
@@ -16,7 +17,7 @@ async function processJob(job) {
     if (job.channel === 'email') {
       await sendEmail({
         to: customer.email,
-        subject: `Campaign message from CEMS`,
+        subject: job.subject || 'Campaign message from CEMS',
         html: `<p>${job.message || 'Hello from CEMS!'}</p>`,
       });
     } else if (job.channel === 'sms') {
@@ -40,18 +41,51 @@ async function hydrateJobs(jobs) {
   const campaignIds = [...new Set(jobs.map(job => job.campaign_id))];
   if (campaignIds.length) {
     const [rows] = await pool.execute(
-      `SELECT id, message FROM campaigns WHERE id IN (${campaignIds.map(() => '?').join(',')})`,
+      `SELECT id, title, message FROM campaigns WHERE id IN (${campaignIds.map(() => '?').join(',')})`,
       campaignIds
     );
     rows.forEach(row => { campaignMap[row.id] = row; });
   }
-  return jobs.map(job => ({ ...job, message: campaignMap[job.campaign_id]?.message }));
+  return jobs.map(job => ({ 
+    ...job, 
+    message: campaignMap[job.campaign_id]?.message,
+    subject: campaignMap[job.campaign_id]?.title
+  }));
+}
+
+async function checkScheduledCampaigns() {
+  const pool = await connectDb();
+  const [rows] = await pool.execute(
+    `SELECT * FROM campaigns WHERE status = 'scheduled' AND scheduled_at <= NOW()`
+  );
+  for (const campaign of rows) {
+    const customers = await selectCustomersForCampaign(campaign);
+    const queueJobs = [];
+    for (const customer of customers) {
+      const channels = campaign.type === 'both' ? ['email', 'sms'] : [campaign.type];
+      for (const channel of channels) {
+        queueJobs.push(
+          enqueueMessage({
+            customer_id: customer.id,
+            campaign_id: campaign.id,
+            channel,
+            status: 'pending',
+            retry_count: 0,
+            scheduled_at: new Date(),
+          })
+        );
+      }
+    }
+    await Promise.all(queueJobs);
+    await pool.execute(`UPDATE campaigns SET status = 'sent' WHERE id = ?`, [campaign.id]);
+  }
 }
 
 async function runWorker() {
   console.log('Queue worker started');
   while (true) {
     try {
+      await checkScheduledCampaigns();
       const pendingJobs = await fetchPendingJobs(50);
       const hydrated = await hydrateJobs(pendingJobs);
       for (const job of hydrated) {

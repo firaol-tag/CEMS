@@ -1,5 +1,5 @@
-const connectDb = require('../config/db');
-const { enqueueMessage } = require('../config/queue');
+const connectDb = require('../../config/db');
+const { enqueueMessage } = require('../../config/queue');
 
 function buildFilterClause(filter) {
   const conditions = [];
@@ -15,6 +15,10 @@ function buildFilterClause(filter) {
   if (filter.gender) {
     conditions.push('gender = ?');
     params.push(filter.gender);
+  }
+  if (filter.customer_type) {
+    conditions.push('customer_type = ?');
+    params.push(filter.customer_type);
   }
   if (filter.email) {
     conditions.push('email = ?');
@@ -39,13 +43,13 @@ async function selectCustomersForCampaign(campaign) {
     params = built.params;
   }
 
-  const [rows] = await pool.execute(sql, params);
+  const [rows] = await pool.query(sql, params);
   return rows;
 }
 
 async function createCampaignRecord(data, createdBy) {
   const pool = await connectDb();
-  const [result] = await pool.execute(
+  const [result] = await pool.query(
     `INSERT INTO campaigns (title, message, type, target_type, target_data, status, scheduled_at, created_by, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
@@ -65,7 +69,7 @@ async function createCampaignRecord(data, createdBy) {
 
 async function getCampaignRecords() {
   const pool = await connectDb();
-  const [rows] = await pool.execute('SELECT * FROM campaigns ORDER BY created_at DESC');
+  const [rows] = await pool.query('SELECT * FROM campaigns ORDER BY created_at DESC');
   return rows.map(row => ({
     ...row,
     target_data: JSON.parse(row.target_data || '{}'),
@@ -74,7 +78,7 @@ async function getCampaignRecords() {
 
 async function getCampaignRecordById(id) {
   const pool = await connectDb();
-  const [rows] = await pool.execute('SELECT * FROM campaigns WHERE id = ?', [id]);
+  const [rows] = await pool.query('SELECT * FROM campaigns WHERE id = ?', [id]);
   if (!rows.length) {
     const err = new Error('Campaign not found');
     err.status = 404;
@@ -97,7 +101,7 @@ async function updateCampaignRecord(id, data) {
   }
   if (!fields.length) return getCampaignRecordById(id);
   params.push(id);
-  await pool.execute(`UPDATE campaigns SET ${fields.join(', ')} WHERE id = ?`, params);
+  await pool.query(`UPDATE campaigns SET ${fields.join(', ')} WHERE id = ?`, params);
   return getCampaignRecordById(id);
 }
 

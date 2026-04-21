@@ -1,4 +1,5 @@
-const mysql = require('mysql2/promise');
+const mysql = require('mysql');
+const { promisify } = require('util');
 
 let pool;
 
@@ -9,10 +10,12 @@ async function connectDb() {
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'cems',
-    waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
   });
+
+  // Promisify the query method
+  pool.query = promisify(pool.query).bind(pool);
+
   await pool.query('SELECT 1');
   console.log('Connected to MySQL');
   return pool;
