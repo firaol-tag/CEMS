@@ -1,47 +1,49 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const connectDb = require('../../config/db');
-
-async function registerUser({ name, email, password }) {
-  const pool = await connectDb();
-  console.log(name,email, password)
-  const [rows] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
-  console.log(rows)
-  if (rows.length) {
-    const err = new Error('Email already registered');
-    err.status = 400;
-    throw err;
+module.exports = {
+  registerUser: (data, callback) => {
+    const { name, email, password } = data;
+    connectDb.query('SELECT id FROM users WHERE email = ?', [email], (err, results) => {
+      if (err) {
+        return callback(err);
+      }
+      if (results.length) {
+        return callback(new Error('Email already registered'));
+      }
+      bcrypt.hash(password, 10, (err, hashedPassword) => {
+        if (err) {
+          return callback(err);
+        }
+        connectDb.query('INSERT INTO users (name, email, password, role, created_at) VALUES (?, ?, ?, ?, ?)', [name, email, hashedPassword, 'admin', new Date()], (err, result) => {
+          if (err) {
+            return callback(err);
+          }
+          return callback(null, { id: result.insertId, name, email, role: 'admin' });
+        });
+      });
+    });
+  },
+  authenticateUser: (data, callback) => {
+    const { email, password } = data;
+    connectDb.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
+      if (err) {
+        return callback(err);
+      }
+      if (!results.length) {
+        return callback(new Error('Invalid credentials'));
+      }
+      const user = results[0];
+      bcrypt.compare(password, user.password, (err, valid) => {
+        if (err) {
+          return callback(err);
+        }
+        if (!valid) {
+          return callback(new Error('Invalid credentials'));
+        }
+        const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET || 'supersecret', { expiresIn: '7d' });
+        return callback(null, token);
+      });
+    });
   }
-  
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const [result] = await pool.query(
-    'INSERT INTO users (name, email, password, role, created_at) VALUES (?, ?, ?, ?, ?)',
-    [name, email, hashedPassword, 'admin', new Date()]
-  );
-
-  return { id: result.insertId, name, email, role: 'admin' };
-}
-
-async function authenticateUser({ email, password }) {
-  const pool = await connectDb();
-  const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-  if (!rows.length) {
-    const err = new Error('Invalid credentials');
-    err.status = 401;
-    throw err;
-  }
-
-  const user = rows[0];
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) {
-    const err = new Error('Invalid credentials');
-    err.status = 401;
-    throw err;
-  }
-
-  return jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET || 'supersecret', {
-    expiresIn: '7d',
-  });
-}
-
-module.exports = { registerUser, authenticateUser };
+};

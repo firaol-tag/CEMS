@@ -6,29 +6,45 @@ const {
   deleteSegmentRecord,
 } = require('../services/segment.service');
 
-async function createSegment(req, res) {
-  const segment = await createSegmentRecord(req.body);
-  res.status(201).json(segment);
-}
-
-async function getSegments(req, res) {
-  const segments = await getSegmentRecords();
-  res.json(segments);
-}
-
-async function getSegmentById(req, res) {
-  const segment = await getSegmentRecordById(req.params.id);
-  res.json(segment);
-}
-
-async function updateSegment(req, res) {
-  const segment = await updateSegmentRecord(req.params.id, req.body);
-  res.json(segment);
-}
-
-async function deleteSegment(req, res) {
-  await deleteSegmentRecord(req.params.id);
-  res.status(204).end();
-}
-
-module.exports = { createSegment, getSegments, getSegmentById, updateSegment, deleteSegment };
+module.exports = {
+  createSegment: (req, res) => {
+    createSegmentRecord(req.body, (err, segment) => {
+      if (err) {
+        return res.status(err.status || 500).json({ message: err.message });
+      }
+      res.status(201).json(segment);
+    });
+  },
+  getSegments: async (req, res) => {
+    try {
+      const segments = await getSegmentRecords();
+      res.json(segments);
+    } catch (err) {
+      res.status(err.status || 500).json({ message: err.message });
+    }
+  },
+  getSegmentById: (req, res) => {
+    getSegmentRecordById(req.params.id, (err, segment) => {
+      if (err) {
+        return res.status(err.status || 500).json({ message: err.message });
+      }
+      res.json(segment);
+    });
+  },
+  updateSegment: (req, res) => {
+    updateSegmentRecord(req.params.id, req.body, (err, segment) => {
+      if (err) {
+        return res.status(err.status || 500).json({ message: err.message });
+      }
+      res.json(segment);
+    });
+  },
+  deleteSegment: (req, res) => {
+    deleteSegmentRecord(req.params.id, (err, result) => {
+      if (err) {
+        return res.status(err.status || 500).json({ message: err.message });
+      }
+      res.status(204).end();
+    });
+  },
+};

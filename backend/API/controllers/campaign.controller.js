@@ -3,45 +3,39 @@ const {
   getCampaignRecords,
   getCampaignRecordById,
   updateCampaignRecord,
-  scheduleCampaignById,
-  triggerCampaignNow,
 } = require('../services/campaign.service');
 
-async function createCampaign(req, res) {
-  const campaign = await createCampaignRecord(req.body, req.user.id);
-  res.status(201).json(campaign);
-}
-
-async function getCampaigns(req, res) {
-  const campaigns = await getCampaignRecords();
-  res.json(campaigns);
-}
-
-async function getCampaignById(req, res) {
-  const campaign = await getCampaignRecordById(req.params.id);
-  res.json(campaign);
-}
-
-async function updateCampaign(req, res) {
-  const campaign = await updateCampaignRecord(req.params.id, req.body);
-  res.json(campaign);
-}
-
-async function scheduleCampaign(req, res) {
-  const campaign = await scheduleCampaignById(req.params.id, req.body.scheduled_at);
-  res.json(campaign);
-}
-
-async function sendCampaignNow(req, res) {
-  const campaign = await triggerCampaignNow(req.params.id);
-  res.json(campaign);
-}
-
 module.exports = {
-  createCampaign,
-  getCampaigns,
-  getCampaignById,
-  updateCampaign,
-  scheduleCampaign,
-  sendCampaignNow,
+  createCampaign: (req, res) => {
+    createCampaignRecord(req.body, req.user.id, (err, campaign) => {
+      if (err) {
+        return res.status(err.status || 500).json({ message: err.message });
+      }
+      res.status(201).json(campaign);
+    });
+  },
+  getCampaigns: (req, res) => {
+    getCampaignRecords((err, campaigns) => {
+      if (err) {
+        return res.status(err.status || 500).json({ message: err.message });
+      }
+      res.json(campaigns);
+    });
+  },
+  getCampaignById: (req, res) => {
+    getCampaignRecordById(req.params.id, (err, campaign) => {
+      if (err) {
+        return res.status(err.status || 500).json({ message: err.message });
+      }
+      res.json(campaign);
+    });
+  },
+  updateCampaign: (req, res) => {
+    updateCampaignRecord(req.params.id, req.body, (err, campaign) => {
+      if (err) {
+        return res.status(err.status || 500).json({ message: err.message });
+      }
+      res.json(campaign);
+    });
+  },
 };

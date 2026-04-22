@@ -1,24 +1,17 @@
-const mysql = require('mysql');
-const { promisify } = require('util');
-
-let pool;
-
-async function connectDb() {
-  if (pool) return pool;
-  pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'cems',
-    connectionLimit: 10,
-  });
-
-  // Promisify the query method
-  pool.query = promisify(pool.query).bind(pool);
-
-  await pool.query('SELECT 1');
-  console.log('Connected to MySQL');
-  return pool;
-}
-
+const mysql = require("mysql");
+require("dotenv").config();
+const connectDb = mysql.createConnection({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+});
+connectDb.connect((err) => {
+  if (err) {
+    console.log("there is something happed with database " + "(" + err + ")");
+  } else {
+    console.log("database is connected");
+  }
+  
+});
 module.exports = connectDb;

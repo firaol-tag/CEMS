@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 require('express-async-errors');
-const connectDb = require('./config/db');
+const {connectDb} = require('./config/db');
 const authRoutes = require('./API/routes/auth.route');
 const customerRoutes = require('./API/routes/customer.route');
 const campaignRoutes = require('./API/routes/campaign.route');
@@ -27,9 +27,6 @@ app.use('/api/messages', authMiddleware, messageRoutes);
 app.use(errorHandler);
 
 const PORT = process.env.PORT;
-connectDb()
-  .then(() => app.listen(PORT, () => console.log(`Backend running on port ${PORT}`)))
-  .catch(err => {
-    console.error('Failed to start server', err);
-    process.exit(1);
-  });
+app.listen(PORT, ()=>{
+  console.log("server is running on ort " + PORT);  
+})

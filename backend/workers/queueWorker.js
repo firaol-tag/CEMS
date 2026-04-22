@@ -5,8 +5,8 @@ const { sendSms } = require('../API/services/sms.service');
 const { selectCustomersForCampaign } = require('../API/services/campaign.service');
 
 async function processJob(job) {
-  const pool = await connectDb();
-  const [customers] = await pool.execute('SELECT * FROM customers WHERE id = ?', [job.customer_id]);
+
+  const [customers] = await connectDb.query('SELECT * FROM customers WHERE id = ?', [job.customer_id]);
   if (!customers.length) {
     await updateJob(job.id, { status: 'failed' });
     return;
@@ -36,7 +36,7 @@ async function processJob(job) {
 
 async function hydrateJobs(jobs) {
   if (!jobs.length) return jobs;
-  const pool = await connectDb();
+
   const campaignMap = {};
   const campaignIds = [...new Set(jobs.map(job => job.campaign_id))];
   if (campaignIds.length) {
@@ -54,7 +54,7 @@ async function hydrateJobs(jobs) {
 }
 
 async function checkScheduledCampaigns() {
-  const pool = await connectDb();
+
   const [rows] = await pool.execute(
     `SELECT * FROM campaigns WHERE status = 'scheduled' AND scheduled_at <= NOW()`
   );

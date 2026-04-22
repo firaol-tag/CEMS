@@ -3,14 +3,21 @@ const {
   getMessageRecordById,
 } = require('../services/message.service');
 
-async function getMessages(req, res) {
-  const messages = await getMessageRecords(req.query);
-  res.json(messages);
-}
-
-async function getMessageById(req, res) {
-  const message = await getMessageRecordById(req.params.id);
-  res.json(message);
-}
-
-module.exports = { getMessages, getMessageById };
+module.exports = {
+  getMessages: (req, res) => {
+    getMessageRecords(req.query, (err, messages) => {
+      if (err) {
+        return res.status(err.status || 500).json({ message: err.message });
+      }
+      res.json(messages);
+    });
+  },
+  getMessageById: (req, res) => {
+    getMessageRecordById(req.params.id, (err, message) => {
+      if (err) {
+        return res.status(err.status || 500).json({ message: err.message });
+      }
+      res.json(message);
+    });
+  },
+};
