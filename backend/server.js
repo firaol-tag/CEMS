@@ -9,6 +9,7 @@ const campaignRoutes = require('./API/routes/campaign.route');
 const segmentRoutes = require('./API/routes/segment.route');
 const messageRoutes = require('./API/routes/message.route');
 const { errorHandler } = require('./middleware/errorMiddleware');
+const { runWorker } = require('./workers/queueWorker');
 
 dotenv.config({ path: __dirname + '/.env' });
 const app = express();
@@ -28,5 +29,7 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT;
 app.listen(PORT, ()=>{
-  console.log("server is running on ort " + PORT);  
-})
+  console.log("server is running on port " + PORT);
+  // Start the queue worker
+  runWorker();
+});

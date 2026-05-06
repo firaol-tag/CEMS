@@ -1,32 +1,28 @@
-const connectDb = require('../../config/db');
+const { query } = require('../../config/db');
 
 module.exports = {
-  getMessageRecords: (query, callback) => {
+  getMessageRecords: async (queryParams) => {
     const conditions = [];
     const params = [];
-    if (query.status) {
+    if (queryParams.status) {
       conditions.push('status = ?');
-      params.push(query.status);
+      params.push(queryParams.status);
     }
-    if (query.channel) {
+    if (queryParams.channel) {
       conditions.push('channel = ?');
-      params.push(query.channel);
+      params.push(queryParams.channel);
     }
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    connectDb.query(`SELECT * FROM message_queue ${whereClause} ORDER BY created_at DESC`, params, (err, results) => {
-      if (err) return callback(err);
-      return callback(null, results);
-    });
+    const results = await query(`SELECT * FROM message_queue ${whereClause} ORDER BY created_at DESC`, params);
+    return results;
   },
-  getMessageRecordById: (id, callback) => {
-    connectDb.query('SELECT * FROM message_queue WHERE id = ?', [id], (err, results) => {
-      if (err) return callback(err);
-      if (!results.length) {
-        const error = new Error('Message not found');
-        error.status = 404;
-        return callback(error);
-      }
-      return callback(null, results[0]);
-    });
+  getMessageRecordById: async (id) => {
+    const results = await query('SELECT * FROM message_queue WHERE id = ?', [id]);
+    if (!results.length) {
+      const error = new Error('Message not found');
+      error.status = 404;
+      throw error;
+    }
+    return results[0];
   },
 };

@@ -4,20 +4,20 @@ const {
 } = require('../services/message.service');
 
 module.exports = {
-  getMessages: (req, res) => {
-    getMessageRecords(req.query, (err, messages) => {
-      if (err) {
-        return res.status(err.status || 500).json({ message: err.message });
-      }
+  getMessages: async (req, res) => {
+    try {
+      const messages = await getMessageRecords(req.query);
       res.json(messages);
-    });
+    } catch (err) {
+      res.status(err.status || 500).json({ message: err.message });
+    }
   },
-  getMessageById: (req, res) => {
-    getMessageRecordById(req.params.id, (err, message) => {
-      if (err) {
-        return res.status(err.status || 500).json({ message: err.message });
-      }
+  getMessageById: async (req, res) => {
+    try {
+      const message = await getMessageRecordById(req.params.id);
       res.json(message);
-    });
+    } catch (err) {
+      res.status(err.status || 500).json({ message: err.message });
+    }
   },
 };

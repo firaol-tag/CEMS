@@ -1,9 +1,9 @@
-const connectDb = require('../../config/db');
+const { query } = require('../../config/db');
 
 module.exports = {
-  createCustomerRecord: (data, callback) => {
+  createCustomerRecord: async (data) => {
     const sql = `INSERT INTO customers (name, email, phone, gender, location, last_purchase_date, created_at, customer_type)
-      VALUES (?)`;
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
     const params = [
       data.name,
       data.email,
@@ -14,48 +14,39 @@ module.exports = {
       new Date(),
       data.customer_type || 'regular',
     ];
-
-    connectDb.query(sql, [params], (err, result) => {
-      if (err){
-        console.log(err) 
-        return callback(err)};
-      console.log(result.insertId)
-      return callback(null, { id: result.insertId, ...data });
-    });
+    
+    const result = await query(sql, params);
+    return { id: result.insertId, ...data };
   },
-  getCustomerRecords: (query, callback) => {
+  getCustomerRecords: async (queryParams) => {
     const conditions = [];
     const params = [];
-    if (query.location) {
+    if (queryParams.location) {
       conditions.push('location = ?');
-      params.push(query.location);
+      params.push(queryParams.location);
     }
-    if (query.gender) {
+    if (queryParams.gender) {
       conditions.push('gender = ?');
-      params.push(query.gender);
+      params.push(queryParams.gender);
     }
-    if (query.customer_type) {
+    if (queryParams.customer_type) {
       conditions.push('customer_type = ?');
-      params.push(query.customer_type);
+      params.push(queryParams.customer_type);
     }
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    connectDb.query(`SELECT * FROM customers ${whereClause} ORDER BY created_at DESC`, params, (err, results) => {
-      if (err) return callback(err);
-      return callback(null, results);
-    });
+    const results = await query(`SELECT * FROM customers ${whereClause} ORDER BY created_at DESC`, params);
+    return results;
   },
-  getCustomerRecordById: (id, callback) => {
-    connectDb.query('SELECT * FROM customers WHERE id = ?', [id], (err, results) => {
-      if (err) return callback(err);
-      if (!results.length) {
-        const error = new Error('Customer not found');
-        error.status = 404;
-        return callback(error);
-      }
-      return callback(null, results[0]);
-    });
+  getCustomerRecordById: async (id) => {
+    const results = await query('SELECT * FROM customers WHERE id = ?', [id]);
+    if (!results.length) {
+      const error = new Error('Customer not found');
+      error.status = 404;
+      throw error;
+    }
+    return results[0];
   },
-  updateCustomerRecord: (id, data, callback) => {
+  updateCustomerRecord: async (id, data) => {
     const fields = [];
     const params = [];
     const allowed = ['name', 'email', 'phone', 'gender', 'location', 'last_purchase_date'];
@@ -66,18 +57,14 @@ module.exports = {
       }
     }
     if (!fields.length) {
-      return getCustomerRecordById(id, callback);
+      return await module.exports.getCustomerRecordById(id);
     }
     params.push(id);
-    connectDb.query(`UPDATE customers SET ${fields.join(', ')} WHERE id = ?`, params, (err, result) => {
-      if (err) return callback(err);
-      getCustomerRecordById(id, callback);
-    });
+    await query(`UPDATE customers SET ${fields.join(', ')} WHERE id = ?`, params);
+    return await module.exports.getCustomerRecordById(id);
   },
-  deleteCustomerRecord: (id, callback) => {
-    connectDb.query('DELETE FROM customers WHERE id = ?', [id], (err, result) => {
-      if (err) return callback(err);
-      return callback(null, result);
-    });
+  deleteCustomerRecord: async (id) => {
+    const result = await query('DELETE FROM customers WHERE id = ?', [id]);
+    return result;
   },
 };

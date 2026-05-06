@@ -3,39 +3,58 @@ const {
   getCampaignRecords,
   getCampaignRecordById,
   updateCampaignRecord,
+  scheduleCampaignById,
+  triggerCampaignNow,
 } = require('../services/campaign.service');
 
 module.exports = {
-  createCampaign: (req, res) => {
-    createCampaignRecord(req.body, req.user.id, (err, campaign) => {
-      if (err) {
-        return res.status(err.status || 500).json({ message: err.message });
-      }
+  createCampaign: async (req, res) => {
+    try {
+      const campaign = await createCampaignRecord(req.body, req.user.id);
       res.status(201).json(campaign);
-    });
+    } catch (err) {
+      res.status(err.status || 500).json({ message: err.message });
+    }
   },
-  getCampaigns: (req, res) => {
-    getCampaignRecords((err, campaigns) => {
-      if (err) {
-        return res.status(err.status || 500).json({ message: err.message });
-      }
+  getCampaigns: async (req, res) => {
+    try {
+      const campaigns = await getCampaignRecords();
       res.json(campaigns);
-    });
+    } catch (err) {
+      res.status(err.status || 500).json({ message: err.message });
+    }
   },
-  getCampaignById: (req, res) => {
-    getCampaignRecordById(req.params.id, (err, campaign) => {
-      if (err) {
-        return res.status(err.status || 500).json({ message: err.message });
-      }
+  getCampaignById: async (req, res) => {
+    try {
+      const campaign = await getCampaignRecordById(req.params.id);
       res.json(campaign);
-    });
+    } catch (err) {
+      res.status(err.status || 500).json({ message: err.message });
+    }
   },
-  updateCampaign: (req, res) => {
-    updateCampaignRecord(req.params.id, req.body, (err, campaign) => {
-      if (err) {
-        return res.status(err.status || 500).json({ message: err.message });
-      }
+  updateCampaign: async (req, res) => {
+    try {
+      const campaign = await updateCampaignRecord(req.params.id, req.body);
       res.json(campaign);
-    });
+    } catch (err) {
+      res.status(err.status || 500).json({ message: err.message });
+    }
+  },
+  scheduleCampaign: async (req, res) => {
+    try {
+      const { scheduled_at } = req.body;
+      const campaign = await scheduleCampaignById(req.params.id, scheduled_at);
+      res.json(campaign);
+    } catch (err) {
+      res.status(err.status || 500).json({ message: err.message });
+    }
+  },
+  sendCampaignNow: async (req, res) => {
+    try {
+      const result = await triggerCampaignNow(req.params.id);
+      res.json(result);
+    } catch (err) {
+      res.status(err.status || 500).json({ message: err.message });
+    }
   },
 };

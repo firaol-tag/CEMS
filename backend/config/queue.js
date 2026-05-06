@@ -1,7 +1,6 @@
-const {connectDb} = require('./db');
+const { query } = require('./db');
 
 async function enqueueMessage(job) {
-
   const sql = `INSERT INTO message_queue (customer_id, campaign_id, channel, status, retry_count, scheduled_at, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)`;
   const params = [
@@ -13,20 +12,16 @@ async function enqueueMessage(job) {
     job.scheduled_at || new Date(),
     new Date(),
   ];
-  await connectDb.query(sql, params);
+  await query(sql, params);
 }
 
 async function fetchPendingJobs(limit = 100) {
-
-  const [rows] = await connectDb.query(
-    `SELECT * FROM message_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT ?`,
-    [limit]
-  );
-  return rows;
+  const sql = `SELECT * FROM message_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT ?`;
+  const results = await query(sql, [limit]);
+  return results;
 }
 
 async function updateJob(jobId, updates) {
-
   const sets = [];
   const params = [];
   for (const key of Object.keys(updates)) {
@@ -36,7 +31,7 @@ async function updateJob(jobId, updates) {
   sets.push('updated_at = ?');
   params.push(new Date());
   params.push(jobId);
-  await connectDb.query(`UPDATE message_queue SET ${sets.join(', ')} WHERE id = ?`, params);
+  await query(`UPDATE message_queue SET ${sets.join(', ')} WHERE id = ?`, params);
 }
 
 module.exports = { enqueueMessage, fetchPendingJobs, updateJob };

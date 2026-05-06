@@ -82,7 +82,7 @@ function Campaigns() {
   };
 
   const sendCampaign = async (id) => {
-    await fetch(`/api/campaigns/${id}/send`, {
+    await fetch(`/api/campaigns/${id}/send-now`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });

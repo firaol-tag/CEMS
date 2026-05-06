@@ -1,4 +1,4 @@
-const connectDb = require('../../config/db');
+const { connectDb, query } = require('../../config/db');
 const { enqueueMessage } = require('../../config/queue');
 
 function buildFilterClause(filter) {
@@ -28,7 +28,7 @@ function buildFilterClause(filter) {
 }
 
 module.exports = {
-  selectCustomersForCampaign: (campaign, callback) => {
+  selectCustomersForCampaign: async (campaign) => {
     let sql = 'SELECT * FROM customers';
     let params = [];
 
@@ -43,15 +43,12 @@ module.exports = {
       params = built.params;
     }
 
-    connectDb.query(sql, params, (err, results) => {
-      if (err) {
-        return callback(err);
-      }
-      return callback(null, results);
-    });
+    const results = await query(sql, params);
+    return results;
   },
-  createCampaignRecord: (data, createdBy, callback) => {
-    connectDb.query(
+  createCampaignRecord: async (data, createdBy) => {
+    const status = data.scheduled_at ? 'scheduled' : 'draft';
+    const result = await query(
       `INSERT INTO campaigns (title, message, type, target_type, target_data, status, scheduled_at, created_by, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -60,46 +57,33 @@ module.exports = {
         data.type,
         data.target_type,
         JSON.stringify(data.target_data || {}),
-        'draft',
+        status,
         data.scheduled_at || null,
         createdBy,
         new Date(),
-      ],
-      (err, result) => {
-        if (err) {
-          return callback(err);
-        }
-        return callback(null, { id: result.insertId, ...data, status: 'draft', created_by: createdBy });
-      }
+      ]
     );
+    return { id: result.insertId, ...data, status, created_by: createdBy };
   },
-  getCampaignRecords: (callback) => {
-    connectDb.query('SELECT * FROM campaigns ORDER BY created_at DESC', (err, results) => {
-      if (err) {
-        return callback(err);
-      }
-      const campaigns = results.map(row => ({
-        ...row,
-        target_data: JSON.parse(row.target_data || '{}'),
-      }));
-      return callback(null, campaigns);
-    });
+  getCampaignRecords: async () => {
+    const results = await query('SELECT * FROM campaigns ORDER BY created_at DESC');
+    const campaigns = results.map(row => ({
+      ...row,
+      target_data: JSON.parse(row.target_data || '{}'),
+    }));
+    return campaigns;
   },
-  getCampaignRecordById: (id, callback) => {
-    connectDb.query('SELECT * FROM campaigns WHERE id = ?', [id], (err, results) => {
-      if (err) {
-        return callback(err);
-      }
-      if (!results.length) {
-        const error = new Error('Campaign not found');
-        error.status = 404;
-        return callback(error);
-      }
-      const row = results[0];
-      return callback(null, { ...row, target_data: JSON.parse(row.target_data || '{}') });
-    });
+  getCampaignRecordById: async (id) => {
+    const results = await query('SELECT * FROM campaigns WHERE id = ?', [id]);
+    if (!results.length) {
+      const error = new Error('Campaign not found');
+      error.status = 404;
+      throw error;
+    }
+    const row = results[0];
+    return { ...row, target_data: JSON.parse(row.target_data || '{}') };
   },
-  updateCampaignRecord: (id, data, callback) => {
+  updateCampaignRecord: async (id, data) => {
     const allowed = ['title', 'message', 'type', 'target_type', 'target_data', 'scheduled_at', 'status'];
     const fields = [];
     const params = [];
@@ -110,54 +94,35 @@ module.exports = {
       }
     }
     if (!fields.length) {
-      return module.exports.getCampaignRecordById(id, callback);
+      return await module.exports.getCampaignRecordById(id);
     }
     params.push(id);
-    connectDb.query(`UPDATE campaigns SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
-      if (err) {
-        return callback(err);
-      }
-      return module.exports.getCampaignRecordById(id, callback);
-    });
+    await query(`UPDATE campaigns SET ${fields.join(', ')} WHERE id = ?`, params);
+    return await module.exports.getCampaignRecordById(id);
   },
-  scheduleCampaignById: (id, scheduledAt, callback) => {
-    module.exports.updateCampaignRecord(id, {
+  scheduleCampaignById: async (id, scheduledAt) => {
+    return await module.exports.updateCampaignRecord(id, {
       scheduled_at: scheduledAt,
       status: 'scheduled',
-    }, callback);
-  },
-  triggerCampaignNow: (id, callback) => {
-    module.exports.getCampaignRecordById(id, (err, campaign) => {
-      if (err) {
-        return callback(err);
-      }
-      module.exports.selectCustomersForCampaign(campaign, (err, customers) => {
-        if (err) {
-          return callback(err);
-        }
-        const queueJobs = [];
-        for (const customer of customers) {
-          const channels = campaign.type === 'both' ? ['email', 'sms'] : [campaign.type];
-          for (const channel of channels) {
-            queueJobs.push(
-              enqueueMessage({
-                customer_id: customer.id,
-                campaign_id: campaign.id,
-                channel,
-                status: 'pending',
-                retry_count: 0,
-              })
-            );
-          }
-        }
-        // Assuming enqueueMessage is synchronous or handle accordingly; for simplicity, proceed
-        module.exports.updateCampaignRecord(id, { status: 'sent' }, (err) => {
-          if (err) {
-            return callback(err);
-          }
-          return callback(null, { ...campaign, status: 'sent', queued: customers.length * (campaign.type === 'both' ? 2 : 1) });
-        });
-      });
     });
+  },
+  triggerCampaignNow: async (id) => {
+    const campaign = await module.exports.getCampaignRecordById(id);
+    const customers = await module.exports.selectCustomersForCampaign(campaign);
+    const queueJobs = [];
+    for (const customer of customers) {
+      const channels = campaign.type === 'both' ? ['email', 'sms'] : [campaign.type];
+      for (const channel of channels) {
+        await enqueueMessage({
+          customer_id: customer.id,
+          campaign_id: campaign.id,
+          channel,
+          status: 'pending',
+          retry_count: 0,
+        });
+      }
+    }
+    const updated = await module.exports.updateCampaignRecord(id, { status: 'sent' });
+    return { ...updated, queued: customers.length * (campaign.type === 'both' ? 2 : 1) };
   },
 };

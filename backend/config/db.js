@@ -14,4 +14,8 @@ connectDb.connect((err) => {
   }
   
 });
-module.exports = connectDb;
+
+const util = require('util');
+const query = util.promisify(connectDb.query).bind(connectDb);
+
+module.exports = { connectDb, query };

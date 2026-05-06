@@ -1,12 +1,11 @@
-const connectDb = require('../config/db');
-const { fetchPendingJobs, updateJob } = require('../config/queue');
+const { query } = require('../config/db');
+const { fetchPendingJobs, updateJob, enqueueMessage } = require('../config/queue');
 const { sendEmail } = require('../config/mailer');
 const { sendSms } = require('../API/services/sms.service');
 const { selectCustomersForCampaign } = require('../API/services/campaign.service');
 
 async function processJob(job) {
-
-  const [customers] = await connectDb.query('SELECT * FROM customers WHERE id = ?', [job.customer_id]);
+  const customers = await query('SELECT * FROM customers WHERE id = ?', [job.customer_id]);
   if (!customers.length) {
     await updateJob(job.id, { status: 'failed' });
     return;
@@ -40,22 +39,22 @@ async function hydrateJobs(jobs) {
   const campaignMap = {};
   const campaignIds = [...new Set(jobs.map(job => job.campaign_id))];
   if (campaignIds.length) {
-    const [rows] = await pool.execute(
-      `SELECT id, title, message FROM campaigns WHERE id IN (${campaignIds.map(() => '?').join(',')})`,
+    const placeholders = campaignIds.map(() => '?').join(',');
+    const rows = await query(
+      `SELECT id, title, message FROM campaigns WHERE id IN (${placeholders})`,
       campaignIds
     );
     rows.forEach(row => { campaignMap[row.id] = row; });
   }
-  return jobs.map(job => ({ 
-    ...job, 
+  return jobs.map(job => ({
+    ...job,
     message: campaignMap[job.campaign_id]?.message,
     subject: campaignMap[job.campaign_id]?.title
   }));
 }
 
 async function checkScheduledCampaigns() {
-
-  const [rows] = await pool.execute(
+  const rows = await query(
     `SELECT * FROM campaigns WHERE status = 'scheduled' AND scheduled_at <= NOW()`
   );
   for (const campaign of rows) {
@@ -77,7 +76,7 @@ async function checkScheduledCampaigns() {
       }
     }
     await Promise.all(queueJobs);
-    await pool.execute(`UPDATE campaigns SET status = 'sent' WHERE id = ?`, [campaign.id]);
+    await query(`UPDATE campaigns SET status = 'sent' WHERE id = ?`, [campaign.id]);
   }
 }
 
@@ -97,6 +96,8 @@ async function runWorker() {
     await new Promise(resolve => setTimeout(resolve, 5000));
   }
 }
+
+module.exports = { runWorker };
 
 runWorker().catch(err => {
   console.error('Worker crashed', err);
