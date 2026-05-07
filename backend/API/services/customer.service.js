@@ -1,13 +1,31 @@
 const { query } = require('../../config/db');
 
+function normalizePhoneNumber(phone) {
+  if (!phone) return null;
+  let normalized = String(phone).trim();
+  if (!normalized) return null;
+  normalized = normalized.replace(/[\s()-]/g, '');
+  if (normalized.startsWith('+')) {
+    return normalized;
+  }
+  if (normalized.startsWith('09') && normalized.length === 10) {
+    return '+251' + normalized.substring(1);
+  }
+  if (normalized.startsWith('251') && normalized.length === 12) {
+    return '+' + normalized;
+  }
+  return '+' + normalized;
+}
+
 module.exports = {
   createCustomerRecord: async (data) => {
+    const phone = normalizePhoneNumber(data.phone);
     const sql = `INSERT INTO customers (name, email, phone, gender, location, last_purchase_date, created_at, customer_type)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
     const params = [
       data.name,
       data.email,
-      data.phone,
+      phone,
       data.gender,
       data.location,
       data.last_purchase_date || null,
@@ -16,7 +34,7 @@ module.exports = {
     ];
     
     const result = await query(sql, params);
-    return { id: result.insertId, ...data };
+    return { id: result.insertId, ...data, phone };
   },
   getCustomerRecords: async (queryParams) => {
     const conditions = [];
@@ -53,7 +71,7 @@ module.exports = {
     for (const key of allowed) {
       if (data[key] !== undefined) {
         fields.push(`${key} = ?`);
-        params.push(data[key]);
+        params.push(key === 'phone' ? normalizePhoneNumber(data.phone) : data[key]);
       }
     }
     if (!fields.length) {

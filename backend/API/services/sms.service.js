@@ -1,15 +1,26 @@
-﻿const AfricasTalking = require('africastalking');
+﻿const axios = require('axios');
 
-const africastalking = AfricasTalking({
-  apiKey: process.env.AT_API_KEY,
-  username: process.env.AT_USERNAME,
-});
+function normalizePhoneNumber(phone) {
+  if (!phone) return null;
+  let normalized = String(phone).trim().replace(/[\s()-]/g, '');
+  if (!normalized) return null;
+  if (normalized.startsWith('+')) {
+    return normalized;
+  }
+  if (normalized.startsWith('09') && normalized.length === 10) {
+    return '+251' + normalized.substring(1);
+  }
+  if (normalized.startsWith('251') && normalized.length === 12) {
+    return '+' + normalized;
+  }
+  return '+' + normalized;
+}
 
-const sms = africastalking.SMS;
+async function sendSms({ to, message, custom_id }) {
+  const apiKey = process.env.SIMGATE_API_KEY;
 
-async function sendSms({ to, message }) {
-  if (!process.env.AT_API_KEY || !process.env.AT_USERNAME) {
-    throw new Error("Africa's Talking credentials are not configured");
+  if (!apiKey) {
+    throw new Error('SimGate API key is not configured');
   }
 
   if (!to) {
@@ -20,20 +31,34 @@ async function sendSms({ to, message }) {
     throw new Error('SMS message content is required');
   }
 
+  const phoneNumber = normalizePhoneNumber(to);
   const payload = {
-    to: [to],
+    phoneNumber,
     message,
   };
 
-  // optional sender ID
-  if (process.env.AT_FROM) {
-    payload.from = process.env.AT_FROM;
+  if (process.env.SIMGATE_DEVICE_ID) {
+    payload.deviceId = process.env.SIMGATE_DEVICE_ID;
   }
 
-  const response = await sms.send(payload);
-  console.log("SMS response:", response);
+  if (custom_id) {
+    payload.custom_id = custom_id;
+  }
 
-  return response;
+  try {
+    const response = await axios.post('https://api.simgate.app/v1/sms/send', payload, {
+      headers: {
+        'x-api-key': apiKey,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log('SMS response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('SMS send error:', error.response ? error.response.data : error.message);
+    throw new Error(`Failed to send SMS: ${error.response ? (error.response.data.message || JSON.stringify(error.response.data)) : error.message}`);
+  }
 }
 
 module.exports = { sendSms };
