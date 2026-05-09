@@ -17,10 +17,12 @@ function normalizePhoneNumber(phone) {
 }
 
 async function sendSms({ to, message, custom_id }) {
-  const apiKey = process.env.SIMGATE_API_KEY;
-
+  const apiKey = process.env.AFROMESSAGE_API_KEY;
+  const senderId = process.env.AFROMESSAGE_SENDER_ID;
+  const identifierId = process.env.AFROMESSAGE_IDENTIFIER_ID; // Optional
+  
   if (!apiKey) {
-    throw new Error('SimGate API key is not configured');
+    throw new Error('AfroMessage API key is not configured');
   }
 
   if (!to) {
@@ -30,25 +32,29 @@ async function sendSms({ to, message, custom_id }) {
   if (!message) {
     throw new Error('SMS message content is required');
   }
-
+  
   const phoneNumber = normalizePhoneNumber(to);
   const payload = {
-    phoneNumber,
-    message,
+    to: phoneNumber,
+    message: message,
+    sender: senderId
   };
 
-  if (process.env.SIMGATE_DEVICE_ID) {
-    payload.deviceId = process.env.SIMGATE_DEVICE_ID;
+  // Add optional parameters if available
+  if (identifierId) {
+    payload.from = identifierId;
   }
+
+  console.log('Prepared SMS payload:', payload);
 
   if (custom_id) {
-    payload.custom_id = custom_id;
+    payload.callback = custom_id; // Use callback for custom_id if provided
   }
-
+  
   try {
-    const response = await axios.post('https://api.simgate.app/v1/sms/send', payload, {
+    const response = await axios.post('https://api.afromessage.com/api/send', payload, {
       headers: {
-        'x-api-key': apiKey,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       }
     });
